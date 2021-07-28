@@ -32,6 +32,8 @@ namespace WebAPIApplication2
                 opt.UseSqlServer(Configuration.GetConnectionString("Default"))
             );
 
+            services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
