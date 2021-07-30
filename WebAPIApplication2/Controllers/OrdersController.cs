@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using WebAPIApplication2.Data;
+using WebAPIApplication2.DTOs;
 using WebAPIApplication2.Models;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -15,12 +17,13 @@ namespace WebAPIApplication2.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IMapper _mapper;
 
-        public OrdersController(AppDbContext context)
+        public OrdersController(AppDbContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
-
 
         // GET: api/<OrdersController>
         [HttpGet]
@@ -122,20 +125,79 @@ namespace WebAPIApplication2.Controllers
 
         // POST api/<OrdersController>
         [HttpPost]
-        public void Post([FromBody] string value)
+        public ActionResult Post(OrderCreateDto value)
         {
+            Order newOrder = _mapper.Map<Order>(value);
+            _context.Orders.Add(newOrder);
+            _context.SaveChanges();
+
+            foreach (int prodId in value.ProductIds)
+            {
+                var op = new OrderProducts { 
+                    OrderId = newOrder.Id,
+                    ProductId = prodId
+                };
+
+                _context.OrderProducts.Add(op);
+            }
+
+            _context.SaveChanges();
+
+            return Ok();
         }
 
         // PUT api/<OrdersController>/5
         [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
+        public ActionResult Put(int id, OrderCreateDto value)
         {
+
+            var orderFromDb = _context.Orders.FirstOrDefault(o => o.Id == id);
+
+            if (orderFromDb == null) return NotFound();
+
+            _mapper.Map(value, orderFromDb);
+
+
+            var productsRange = _context
+                .OrderProducts
+                .Where(op => op.OrderId == id)
+                .ToList();
+
+            _context.OrderProducts.RemoveRange(productsRange);
+
+            foreach (var prodId in value.ProductIds)
+            {
+                var opNew = new OrderProducts { 
+                    OrderId = id,
+                    ProductId = prodId
+                };
+
+                _context.OrderProducts.Add(opNew);
+            }
+
+            _context.SaveChanges();
+
+            return Ok();
         }
 
         // DELETE api/<OrdersController>/5
         [HttpDelete("{id}")]
-        public void Delete(int id)
+        public ActionResult Delete(int id)
         {
+            Order orderToDelete = _context.Orders.Find(id);
+
+            if (orderToDelete == null) return NotFound();
+
+            var productsRange = _context
+                  .OrderProducts
+                  .Where(op => op.OrderId == id)
+                  .ToList();
+
+            _context.OrderProducts.RemoveRange(productsRange);
+            _context.Orders.Remove(orderToDelete);
+            _context.SaveChanges();
+
+            return Ok();
         }
     }
 }
